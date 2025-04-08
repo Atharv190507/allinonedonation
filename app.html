@@ -1,0 +1,119 @@
+// App.tsx (Main Entry with Authentication, Payment, Dashboard)
+
+import React, { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { login, signup } from "./authService";
+import Dashboard from "./Dashboard";
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [isSignup, setIsSignup] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleAuth = async () => {
+    const authFunc = isSignup ? signup : login;
+    const res = await authFunc(email, password);
+    if (res?.user) setUser(res.user);
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <Card className="p-6 w-full max-w-sm">
+          <CardContent>
+            <h2 className="text-xl font-bold text-center mb-4">{isSignup ? "Sign Up" : "Login"}</h2>
+            <div className="space-y-4">
+              <Input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Button className="w-full" onClick={handleAuth}>{isSignup ? "Sign Up" : "Login"}</Button>
+              <p className="text-center text-sm text-gray-500 cursor-pointer" onClick={() => setIsSignup(!isSignup)}>
+                {isSignup ? "Already have an account? Login" : "Don't have an account? Sign up"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <Dashboard user={user} />;
+}
+
+// Dashboard.tsx
+import React, { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HeartHandshake, HandCoins, Droplets, Shirt, Trash2, Pencil } from "lucide-react";
+import DonationForm from "./DonationForm";
+import { db } from "./firebaseConfig";
+import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
+
+export default function Dashboard({ user }: { user: any }) {
+  const [donations, setDonations] = useState<any[]>([]);
+
+  const fetchDonations = async () => {
+    const q = query(collection(db, "donations"), where("userId", "==", user.uid));
+    const querySnapshot = await getDocs(q);
+    const data = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    setDonations(data);
+  };
+
+  useEffect(() => {
+    fetchDonations();
+  }, [user]);
+
+  const handleDelete = async (id: string) => {
+    await deleteDoc(doc(db, "donations", id));
+    fetchDonations();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <h1 className="text-3xl font-bold text-center mb-6">Welcome, {user.email}</h1>
+      <Tabs defaultValue="funds" className="max-w-5xl mx-auto">
+        <TabsList className="grid grid-cols-5 gap-2 mb-6">
+          <TabsTrigger value="funds"><HandCoins className="mr-2 h-4 w-4" /> Funds</TabsTrigger>
+          <TabsTrigger value="food"><HeartHandshake className="mr-2 h-4 w-4" /> Food</TabsTrigger>
+          <TabsTrigger value="blood"><Droplets className="mr-2 h-4 w-4" /> Blood</TabsTrigger>
+          <TabsTrigger value="clothes"><Shirt className="mr-2 h-4 w-4" /> Clothes</TabsTrigger>
+          <TabsTrigger value="view">📄 My Donations</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="funds"><DonationForm type="funds" user={user} /></TabsContent>
+        <TabsContent value="food"><DonationForm type="food" user={user} /></TabsContent>
+        <TabsContent value="blood"><DonationForm type="blood" user={user} /></TabsContent>
+        <TabsContent value="clothes"><DonationForm type="clothes" user={user} /></TabsContent>
+        <TabsContent value="view">
+          <Card className="p-4">
+            <CardContent>
+              <h2 className="text-xl font-semibold mb-4">My Donations</h2>
+              {donations.length === 0 ? (
+                <p>No donations yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {donations.map((donation) => (
+                    <li key={donation.id} className="p-3 rounded bg-white shadow relative">
+                      <p><strong>Type:</strong> {donation.type}</p>
+                      <p><strong>Name:</strong> {donation.name}</p>
+                      <p><strong>Description:</strong> {donation.description}</p>
+                      <p><strong>Location:</strong> {donation.location}</p>
+                      <p><strong>Contact:</strong> {donation.contact}</p>
+                      <div className="absolute top-2 right-2 flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(donation.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// Remaining files unchanged
